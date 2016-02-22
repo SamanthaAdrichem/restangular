@@ -526,7 +526,6 @@ restangular.provider('Restangular', function() {
           };
 
         } else {
-
           resource[key] = function(data) {
             return $http(_.extend(value, {
               url: url,
@@ -1109,8 +1108,25 @@ restangular.provider('Restangular', function() {
           }
         };
 
-        urlHandler.resource(this, $http, request.httpConfig, request.headers, request.params, what,
-                this[config.restangularFields.etag], operation)[method]().then(okCallback, function error(response) {
+        var callHeaders = _.extend({}, request.headers);
+        var callOperation = methodOverrideFunction( 'get', callHeaders );
+
+        var errorCallback = function( response ) {
+          if (response.status === 304 && __this[config.restangularFields.restangularCollection]) {
+              resolvePromise(deferred, response, __this, filledArray);
+          } else if ( _.every(config.errorInterceptors, function(cb) { return cb(response, deferred, okCallback) !== false; }) ) {
+            // triggered if no callback returns false
+            deferred.reject(response);
+          }
+        };
+
+
+        if (config.isOverridenMethod('get')) {
+          var caller = urlHandler.resource(this, $http, request.httpConfig, callHeaders, {}, what, this[config.restangularFields.etag], callOperation)[ callOperation ]( request.params );
+        } else {
+          var caller = urlHandler.resource(this, $http, request.httpConfig, callHeaders, request.params, what, this[config.restangularFields.etag], callOperation)[ callOperation ]();
+        }
+        caller.then(okCallback, function error(response) {
           if (response.status === 304 && __this[config.restangularFields.restangularCollection]) {
             resolvePromise(deferred, response, __this, filledArray);
           } else if ( _.every(config.errorInterceptors, function(cb) { return cb(response, deferred, okCallback) !== false; }) ) {
@@ -1133,6 +1149,22 @@ restangular.provider('Restangular', function() {
         } else {
           return _.bind(elemFunction, this)('post', undefined, params, undefined, headers);
         }
+      }
+
+      /**
+       * Overriding HTTP Method,
+       * Returns the new call operation, headers will be extended automatically 
+       */
+      function methodOverrideFunction( operation, callHeaders ) {
+        var callOperation = operation;
+        var isOverrideOperation = config.isOverridenMethod(operation);
+        if (isOverrideOperation) {
+          callOperation = 'post';
+          callHeaders = _.extend(callHeaders, {'X-HTTP-Method-Override': operation === 'remove' ? 'DELETE' : operation.toUpperCase()});
+        } else if (config.jsonp && callOperation === 'get') {
+          callOperation = 'jsonp';
+        }
+        return callOperation;
       }
 
       function elemFunction(operation, what, params, obj, headers) {
@@ -1198,21 +1230,16 @@ restangular.provider('Restangular', function() {
             deferred.reject(response);
           }
         };
-        // Overriding HTTP Method
-        var callOperation = operation;
+
         var callHeaders = _.extend({}, request.headers);
-        var isOverrideOperation = config.isOverridenMethod(operation);
-        if (isOverrideOperation) {
-          callOperation = 'post';
-          callHeaders = _.extend(callHeaders, {'X-HTTP-Method-Override': operation === 'remove' ? 'DELETE' : operation.toUpperCase()});
-        } else if (config.jsonp && callOperation === 'get') {
-          callOperation = 'jsonp';
-        }
+        var callOperation = methodOverrideFunction( operation, callHeaders );
 
         if (config.isSafe(operation)) {
-          if (isOverrideOperation) {
-            urlHandler.resource(this, $http, request.httpConfig, callHeaders, request.params,
-              what, etag, callOperation)[callOperation]({}).then(okCallback, errorCallback);
+          if (config.isOverridenMethod(operation)) {
+            var useParams = operation.toLowerCase() == 'get' ? {} : request.params;
+            var useBody = operation.toLowerCase() == 'get' ? request.params : {};
+            urlHandler.resource(this, $http, request.httpConfig, callHeaders, useParams,
+              what, etag, callOperation)[callOperation]( useBody ).then(okCallback, errorCallback);
           } else {
             urlHandler.resource(this, $http, request.httpConfig, callHeaders, request.params,
               what, etag, callOperation)[callOperation]().then(okCallback, errorCallback);

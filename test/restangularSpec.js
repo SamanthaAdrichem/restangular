@@ -930,6 +930,70 @@ describe("Restangular", function() {
     });
   });
 
+  describe("methodOverride", function() {
+	  it("should use params in uri on PUT with override disabled", function () {
+		  $httpBackend.expectPUT('/overriders/1?foo=1').respond(function(method, url, data, headers) {
+			expect(headers['X-HTTP-Method-Override']).toBe(undefined);
+			return {};
+		  });
+		  Restangular.one('overriders', 1).put({foo: 1});
+		  $httpBackend.flush();
+	  } );
+
+	  it("should use params in uri on PUT with override enabled", function () {
+		  Restangular.setMethodOverriders(["put"]);
+		  $httpBackend.expectPOST('/overriders/1?foo=1').respond(function(method, url, data, headers) {
+			expect(headers['X-HTTP-Method-Override']).toBe('PUT');
+			return {};
+		  });
+		  Restangular.one('overriders', 1).put({foo: 1});
+		  $httpBackend.flush();
+	  } );
+
+	  it ("should use params in uri on GET with override disabled", function() {
+		  $httpBackend.expectGET('/overriders/1?foo=1').respond(function(method, url, data, headers) {
+			expect(headers['X-HTTP-Method-Override']).toBe(undefined);
+			expect(data).toBe(undefined);
+			return {};
+		  });
+		  Restangular.one('overriders', 1).get({foo: 1});
+		  $httpBackend.flush();
+	  } );
+
+	  it ("should use params as body on GET with override enabled", function() {
+		  Restangular.setMethodOverriders(["get"]);
+		  $httpBackend.expectPOST('/overriders/1').respond(function(method, url, data, headers) {
+			expect(headers['X-HTTP-Method-Override']).toBe('GET');
+			expect(data).toBe('{"foo":1}');
+			return {};
+		  });
+		  Restangular.one('overriders', 1).get({foo: 1});
+		  $httpBackend.flush();
+	  } );
+
+	  it ("should use params in uri on getList with override disabled", function() {
+		  $httpBackend.expectGET('/overriders?foo=1').respond(function(method, url, data, headers) {
+			expect(headers['X-HTTP-Method-Override']).toBe(undefined);
+			expect(data).toBe(undefined);
+			return {};
+		  });
+		  Restangular.all('overriders').getList({foo: 1});
+		  $httpBackend.flush();
+	  } );
+
+	  it ("should use params as body on getList with override enabled", function() {
+		  Restangular.setMethodOverriders(["get"]);
+		  $httpBackend.expectPOST('/overriders').respond(function(method, url, data, headers) {
+			expect(headers['X-HTTP-Method-Override']).toBe('GET');
+			expect(data).toBe('{"foo":1}');
+			return {};
+		  });
+		  Restangular.all('overriders').getList({foo: 1});
+		  $httpBackend.flush();
+	  } );
+
+  } );
+
   describe("defaultRequestParams", function() {
     it("should return defaultRequestParams", function() {
       var defaultRequestParams = {param:'value'};
